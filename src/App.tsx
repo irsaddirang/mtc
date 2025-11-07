@@ -522,14 +522,38 @@ function App() {
                             </span>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => openEditModal(event)}
-                                className="rounded-full bg-slate-900/10 p-2 transition hover:bg-slate-900/20"
+                                onClick={() => {
+                                  if (!isAuthenticated) {
+                                    window.alert('Silakan login terlebih dahulu.')
+                                    return
+                                  }
+                                  openEditModal(event)
+                                }}
+                                disabled={!isAuthenticated || isSyncing}
+                                className={clsx(
+                                  'rounded-full p-2 transition',
+                                  isAuthenticated && !isSyncing
+                                    ? 'bg-slate-900/10 hover:bg-slate-900/20'
+                                    : 'cursor-not-allowed bg-slate-200 text-slate-400',
+                                )}
                               >
                                 <PencilLine className="h-4 w-4 text-slate-900" />
                               </button>
                               <button
-                                onClick={() => handleDelete(event.id)}
-                                className="rounded-full bg-rose-100 p-2 text-rose-600 transition hover:bg-rose-200"
+                                onClick={() => {
+                                  if (!isAuthenticated) {
+                                    window.alert('Silakan login terlebih dahulu.')
+                                    return
+                                  }
+                                  handleDelete(event.id)
+                                }}
+                                disabled={!isAuthenticated || isSyncing}
+                                className={clsx(
+                                  'rounded-full p-2 transition',
+                                  isAuthenticated && !isSyncing
+                                    ? 'bg-rose-100 text-rose-600 hover:bg-rose-200'
+                                    : 'cursor-not-allowed bg-rose-50 text-rose-300',
+                                )}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
