@@ -154,6 +154,13 @@ function App() {
     fetchEvents()
   }, [fetchEvents])
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      fetchEvents()
+    }, 10 * 60 * 1000)
+    return () => window.clearInterval(interval)
+  }, [fetchEvents])
+
   const activeWindows = events.filter((event) => event.status !== 'Completed')
   const notificationsCoverage = Math.round(
     (events.filter((event) => event.notificationsSent).length /
