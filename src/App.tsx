@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
@@ -13,6 +13,7 @@ import {
 import clsx from 'clsx'
 import { format } from 'date-fns'
 import { id as localeID } from 'date-fns/locale'
+import { supabase } from './lib/supabase'
 
 type ImpactLevel = 'Low' | 'Medium' | 'High'
 type MaintenanceStatus = 'Scheduled' | 'In Progress' | 'Completed'
@@ -38,7 +39,6 @@ interface MaintenanceDraft
   id?: string
 }
 
-const STORAGE_KEY = 'aurora-maintenance-events'
 const PASSCODE = '6666'
 const MACHINE_OPTIONS = [
   'CX',
@@ -80,91 +80,10 @@ const MACHINE_OPTIONS = [
   'SM74',
 ] as const
 
-const seedEvents: MaintenanceEvent[] = [
-  {
-    id: 'evt-01',
-    title: 'Edge firewall firmware uplift',
-    system: 'Global Network Edge',
-    owner: 'Isyana Paramita',
-    environment: 'Production',
-    status: 'Scheduled',
-    impact: 'Medium',
-    notificationsSent: true,
-    startDate: '2025-11-08T01:30:00.000Z',
-    endDate: '2025-11-08T03:30:00.000Z',
-    description:
-      'Rolling firmware refresh with live health probes and automated rollback checkpoints for the APAC edge clusters.',
-    createdAt: '2025-10-30T08:00:00.000Z',
-  },
-  {
-    id: 'evt-02',
-    title: 'Aurora DB shard rebalancing',
-    system: 'Payments Data Lake',
-    owner: 'Michelle Santoso',
-    environment: 'Production',
-    status: 'In Progress',
-    impact: 'High',
-    notificationsSent: false,
-    startDate: '2025-11-07T16:00:00.000Z',
-    endDate: '2025-11-07T20:30:00.000Z',
-    description:
-      'Hot-standby promotion with online checksum validation. Expect elevated latency on reconciliation APIs.',
-    createdAt: '2025-11-01T04:25:00.000Z',
-  },
-  {
-    id: 'evt-03',
-    title: 'Observability pipeline refresh',
-    system: 'Telmetry Matrix',
-    owner: 'Andre Kurnia',
-    environment: 'Staging',
-    status: 'Completed',
-    impact: 'Low',
-    notificationsSent: true,
-    startDate: '2025-11-05T02:15:00.000Z',
-    endDate: '2025-11-05T03:00:00.000Z',
-    description:
-      'Migrated collectors to OTEL 1.8 with lossless replay validation. Artifacts promoted to prod-ready bucket.',
-    createdAt: '2025-10-28T10:15:00.000Z',
-  },
-  {
-    id: 'evt-04',
-    title: 'Private cloud zone expansion',
-    system: 'Nimbus Fabric',
-    owner: 'Rahmat Alamsyah',
-    environment: 'Disaster Recovery',
-    status: 'Scheduled',
-    impact: 'High',
-    notificationsSent: false,
-    startDate: '2025-11-09T05:00:00.000Z',
-    endDate: '2025-11-09T09:45:00.000Z',
-    description:
-      'Scale-out of compute pools with new AZ parity. Includes live migration rehearsal and health scoring.',
-    createdAt: '2025-11-02T06:30:00.000Z',
-  },
-]
-
 const impactStyles: Record<ImpactLevel, string> = {
   High: 'bg-rose-100 text-rose-600 border-rose-200',
   Medium: 'bg-amber-100 text-amber-600 border-amber-200',
   Low: 'bg-emerald-100 text-emerald-600 border-emerald-200',
-}
-
-const getInitialEvents = (): MaintenanceEvent[] => {
-  if (typeof window === 'undefined') {
-    return seedEvents
-  }
-
-  const persisted = window.localStorage.getItem(STORAGE_KEY)
-  if (!persisted) {
-    return seedEvents
-  }
-
-  try {
-    const parsed = JSON.parse(persisted) as MaintenanceEvent[]
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : seedEvents
-  } catch {
-    return seedEvents
-  }
 }
 
 const formatDate = (iso: string, pattern = "EEEE, d MMMM yyyy") => {
@@ -183,19 +102,57 @@ const getDateKey = (iso: string) => {
   }
 }
 
-const createId = () =>
-  typeof crypto !== 'undefined' && crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2, 10)
-
 function App() {
-  const [events, setEvents] = useState<MaintenanceEvent[]>(getInitialEvents)
+  const [events, setEvents] = useState<MaintenanceEvent[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [draft, setDraft] = useState<MaintenanceDraft | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const normaliseEvent = (row: Record<string, any>): MaintenanceEvent => ({
+    id: row.id ?? row.uuid ?? '',
+    title: row.title ?? '',
+    system: row.system ?? row.machine ?? '',
+    owner: row.owner ?? '',
+    environment: (row.environment as Environment) ?? 'Production',
+    status: (row.status as MaintenanceStatus) ?? 'Scheduled',
+    impact: (row.impact as ImpactLevel) ?? 'Medium',
+    notificationsSent: row.notifications_sent ?? row.notificationsSent ?? false,
+    startDate: row.start_date ?? row.startDate ?? new Date().toISOString(),
+    endDate:
+      row.end_date ??
+      row.endDate ??
+      row.start_date ??
+      row.startDate ??
+      new Date().toISOString(),
+    description: row.description ?? '',
+    createdAt: row.created_at ?? row.createdAt ?? new Date().toISOString(),
+  })
+
+  const fetchEvents = useCallback(async () => {
+    setIsLoading(true)
+    setErrorMessage('')
+    const { data, error } = await supabase
+      .from('maintenance_events')
+      .select('*')
+      .order('start_date', { ascending: true })
+
+    if (error) {
+      console.error(error)
+      setErrorMessage('Gagal memuat data dari Supabase.')
+      setIsLoading(false)
+      return
+    }
+
+    setEvents((data ?? []).map(normaliseEvent))
+    setIsLoading(false)
+  }, [])
+
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
-  }, [events])
+    fetchEvents()
+  }, [fetchEvents])
 
   const activeWindows = events.filter((event) => event.status !== 'Completed')
   const notificationsCoverage = Math.round(
@@ -252,38 +209,76 @@ function App() {
     return Array.from(map.values())
   }, [filteredEvents])
 
-  const handleSubmit = (payload: MaintenanceDraft) => {
-    setEvents((prev) => {
+  const handleSubmit = async (payload: MaintenanceDraft) => {
+    try {
+      setIsSyncing(true)
+      setErrorMessage('')
+
       if (payload.id) {
-        return prev.map((item) =>
-          item.id === payload.id
-            ? {
-                ...item,
-                ...payload,
-              }
-            : item,
-        )
+        const { error } = await supabase
+          .from('maintenance_events')
+          .update({
+            title: payload.title,
+            system: payload.system,
+            owner: payload.owner,
+            environment: payload.environment,
+            status: payload.status,
+            impact: payload.impact,
+            notifications_sent: payload.notificationsSent,
+            start_date: payload.startDate,
+            end_date: payload.endDate,
+            description: payload.description,
+          })
+          .eq('id', payload.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('maintenance_events').insert({
+          title: payload.title,
+          system: payload.system,
+          owner: payload.owner,
+          environment: payload.environment,
+          status: payload.status,
+          impact: payload.impact,
+          notifications_sent: payload.notificationsSent,
+          start_date: payload.startDate,
+          end_date: payload.endDate,
+          description: payload.description,
+        })
+        if (error) throw error
       }
 
-      const nextEvent: MaintenanceEvent = {
-        ...payload,
-        id: createId(),
-        createdAt: new Date().toISOString(),
-      }
-      return [nextEvent, ...prev]
-    })
-    setIsFormOpen(false)
-    setDraft(null)
+      await fetchEvents()
+      setIsFormOpen(false)
+      setDraft(null)
+    } catch (error) {
+      console.error(error)
+      window.alert('Gagal menyimpan jadwal. Coba lagi.')
+    } finally {
+      setIsSyncing(false)
+    }
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (
       typeof window !== 'undefined' &&
       !window.confirm('Hapus jadwal maintenance ini?')
     ) {
       return
     }
-    setEvents((prev) => prev.filter((event) => event.id !== id))
+    try {
+      setIsSyncing(true)
+      const { error } = await supabase
+        .from('maintenance_events')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      await fetchEvents()
+    } catch (error) {
+      console.error(error)
+      window.alert('Gagal menghapus jadwal.')
+    } finally {
+      setIsSyncing(false)
+    }
   }
 
   const createDefaultDateISO = () => {
@@ -370,14 +365,14 @@ function App() {
               }}
               className={clsx(
                 'flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold text-slate-900 shadow-xl transition',
-                isAuthenticated
+                isAuthenticated && !isSyncing
                   ? 'bg-gradient-to-r from-aurora-teal via-aurora-blue to-aurora-purple hover:scale-[1.03]'
                   : 'bg-slate-300 text-slate-500 cursor-not-allowed',
               )}
-              disabled={!isAuthenticated}
+              disabled={!isAuthenticated || isSyncing}
             >
               <CalendarPlus className="h-4 w-4" />
-              Jadwalkan Maint
+              {isSyncing ? 'Memproses...' : 'Jadwalkan Maint'}
             </button>
           </div>
         </motion.nav>
@@ -455,11 +450,21 @@ function App() {
             </div>
           ))}
         </section>
+        {errorMessage && (
+          <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700">
+            {errorMessage}
+          </div>
+        )}
 
         <section className="mt-10 space-y-6">
           <div className="space-y-6">
             <div className="space-y-6">
-              {groupedEvents.length > 0 ? (
+              {isLoading ? (
+                <div className="glass-panel flex flex-col items-center gap-2 px-6 py-12 text-center text-slate-500">
+                  <Sparkles className="h-10 w-10 text-slate-300 animate-pulse" />
+                  <p>Memuat jadwal dari Supabase...</p>
+                </div>
+              ) : groupedEvents.length > 0 ? (
                 groupedEvents.map((group, index) => (
                   <div key={group.key} className="glass-panel overflow-hidden">
                     <div
