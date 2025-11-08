@@ -4,13 +4,6 @@
 @tailwind components;
 @tailwind utilities;
 
-html,
-body,
-#root {
-  height: 100%;
-  overflow: hidden;
-}
-
 :root {
   font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter',
     'Segoe UI', sans-serif;

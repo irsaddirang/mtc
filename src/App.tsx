@@ -40,10 +40,6 @@ interface MaintenanceDraft
 }
 
 const PASSCODE = '6666'
-const BASE_WIDTH = 1440
-const BASE_HEIGHT = 900
-const MIN_SCALE = 0.6
-const MAX_SCALE = 1.2
 const MACHINE_OPTIONS = [
   'CX',
   'XL',
@@ -106,14 +102,6 @@ const getDateKey = (iso: string) => {
   }
 }
 
-const computeScale = () => {
-  if (typeof window === 'undefined') return 1
-  const scaleWidth = window.innerWidth / BASE_WIDTH
-  const scaleHeight = window.innerHeight / BASE_HEIGHT
-  const next = Math.min(scaleWidth, scaleHeight)
-  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, next))
-}
-
 function App() {
   const [events, setEvents] = useState<MaintenanceEvent[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -122,7 +110,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const [scale, setScale] = useState(1)
 
   const normaliseEvent = (row: Record<string, any>): MaintenanceEvent => ({
     id: row.id ?? row.uuid ?? '',
@@ -166,13 +153,6 @@ function App() {
   useEffect(() => {
     fetchEvents()
   }, [fetchEvents])
-
-  useEffect(() => {
-    const update = () => setScale(computeScale())
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -353,15 +333,8 @@ function App() {
   }
 
   return (
-    <div className="relative flex min-h-screen w-screen items-start justify-center overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900">
-      <div
-        className="relative origin-top px-6 pb-20 pt-10"
-        style={{
-          transform: `scale(${scale})`,
-          width: `${BASE_WIDTH}px`,
-          minHeight: `${BASE_HEIGHT}px`,
-        }}
-      >
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900">
+      <div className="mx-auto w-full max-w-[1800px] px-4 pb-20 pt-10 md:px-8">
         <motion.nav
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -437,7 +410,7 @@ function App() {
           </div>
         </motion.section>
 
-        <section className="mt-10 grid gap-5 md:grid-cols-3">
+        <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {[
             {
               label: 'Active windows',
@@ -492,7 +465,7 @@ function App() {
 
         <section className="mt-10 space-y-6">
           <div className="space-y-6">
-            <div className="space-y-6">
+            <div className="grid gap-6 xl:grid-cols-2">
               {isLoading ? (
                 <div className="glass-panel flex flex-col items-center gap-2 px-6 py-12 text-center text-slate-500">
                   <Sparkles className="h-10 w-10 text-slate-300 animate-pulse" />
