@@ -40,6 +40,10 @@ interface MaintenanceDraft
 }
 
 const PASSCODE = '6666'
+const BASE_WIDTH = 1440
+const BASE_HEIGHT = 900
+const MIN_SCALE = 0.6
+const MAX_SCALE = 1.2
 const MACHINE_OPTIONS = [
   'CX',
   'XL',
@@ -102,6 +106,14 @@ const getDateKey = (iso: string) => {
   }
 }
 
+const computeScale = () => {
+  if (typeof window === 'undefined') return 1
+  const scaleWidth = window.innerWidth / BASE_WIDTH
+  const scaleHeight = window.innerHeight / BASE_HEIGHT
+  const next = Math.min(scaleWidth, scaleHeight)
+  return Math.min(MAX_SCALE, Math.max(MIN_SCALE, next))
+}
+
 function App() {
   const [events, setEvents] = useState<MaintenanceEvent[]>([])
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -110,6 +122,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [scale, setScale] = useState(1)
 
   const normaliseEvent = (row: Record<string, any>): MaintenanceEvent => ({
     id: row.id ?? row.uuid ?? '',
@@ -153,6 +166,13 @@ function App() {
   useEffect(() => {
     fetchEvents()
   }, [fetchEvents])
+
+  useEffect(() => {
+    const update = () => setScale(computeScale())
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -333,8 +353,15 @@ function App() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900">
-      <div className="relative mx-auto max-w-6xl px-6 pb-20 pt-10">
+    <div className="relative flex min-h-screen w-screen items-start justify-center overflow-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900">
+      <div
+        className="relative origin-top px-6 pb-20 pt-10"
+        style={{
+          transform: `scale(${scale})`,
+          width: `${BASE_WIDTH}px`,
+          minHeight: `${BASE_HEIGHT}px`,
+        }}
+      >
         <motion.nav
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
