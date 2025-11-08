@@ -162,22 +162,6 @@ function App() {
   }, [fetchEvents])
 
   const activeWindows = events.filter((event) => event.status !== 'Completed')
-  const notificationsCoverage = Math.round(
-    (events.filter((event) => event.notificationsSent).length /
-      Math.max(events.length, 1)) *
-      100,
-  )
-  const completedPercentage = Math.round(
-    (events.filter((event) => event.status === 'Completed').length /
-      Math.max(events.length, 1)) *
-      100,
-  )
-  const availabilityScore = Math.min(
-    100,
-    Math.round(
-      78 + notificationsCoverage / 5 + completedPercentage / 8 - activeWindows.length * 3,
-    ),
-  )
   const totalMachines = new Set(
     events
       .map((event) => event.system.trim())
@@ -334,7 +318,7 @@ function App() {
 
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900">
-      <div className="mx-auto w-full max-w-[1800px] px-4 pb-20 pt-10 md:px-8">
+      <div className="mx-auto w-full max-w-[2000px] px-4 pb-20 pt-10 md:px-10">
         <motion.nav
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -390,82 +374,82 @@ function App() {
           transition={{ delay: 0.05 }}
           className="glass-panel animated-header relative overflow-hidden p-8"
         >
-          <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="relative grid gap-6 lg:grid-cols-[1.2fr,1fr] 2xl:grid-cols-[1.1fr,1.3fr]">
             <div>
-              <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight text-slate-900 md:text-5xl">
+              <h1 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 md:text-4xl">
                 Jadwal Pekerjaan Maintenance
               </h1>
+              <p className="mt-2 text-sm text-slate-600">
+                Pantau jadwal maintenance lintas sistem dalam satu view responsif.
+              </p>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <p className="text-sm uppercase tracking-[0.3em] text-slate-400">
-                HEALTH SCORE
-              </p>
-              <p className="mt-2 text-5xl font-semibold text-slate-900">
-                {availabilityScore}%
-              </p>
-              <p className="text-sm text-slate-500">
-                Adaptive SLO based on notifications &amp; completion
-              </p>
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3">
+              {[
+                {
+                  label: 'Active windows',
+                  value: activeWindows.length,
+                  sub: `${events.length} jadwal keseluruhan`,
+                  icon: CalendarClock,
+                },
+                {
+                  label: 'High impact',
+                  value: events.filter((event) => event.impact === 'High').length,
+                  sub: 'latensi diawasi langsung',
+                  icon: Activity,
+                },
+                {
+                  label: 'Total machine',
+                  value: totalMachines,
+                  sub: 'mesin terjadwal',
+                  icon: Sparkles,
+                },
+              ].map((stat, index) => (
+                <div
+                  key={stat.label}
+                  className={clsx(
+                    'relative overflow-hidden rounded-3xl p-[1px] shadow-xl bg-gradient-to-br',
+                    statCardGradients[(index + 1) % statCardGradients.length],
+                  )}
+                >
+                  <div className="glass-panel relative h-full w-full bg-white/90 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
+                          {stat.label}
+                        </p>
+                        <p className="mt-1 text-3xl font-semibold text-slate-900">
+                          {stat.value}
+                        </p>
+                        <p className="text-xs text-slate-500">{stat.sub}</p>
+                      </div>
+                      <div className="rounded-2xl bg-white/80 p-3 backdrop-blur-xl">
+                        <stat.icon className="h-5 w-5 text-slate-900" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </motion.section>
-
-        <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {[
-            {
-              label: 'Active windows',
-              value: activeWindows.length,
-              sub: `${events.length} jadwal keseluruhan`,
-              icon: CalendarClock,
-            },
-            {
-              label: 'High impact',
-              value: events.filter((event) => event.impact === 'High').length,
-              sub: 'latensi diawasi langsung',
-              icon: Activity,
-            },
-            {
-              label: 'Total machine',
-              value: totalMachines,
-              sub: 'mesin terjadwal',
-              icon: Sparkles,
-            },
-          ].map((stat, index) => (
-            <div
-              key={stat.label}
-              className={clsx(
-                'relative overflow-hidden rounded-3xl p-[1px] shadow-xl bg-gradient-to-br',
-                statCardGradients[index % statCardGradients.length],
-              )}
-            >
-              <div className="glass-panel relative h-full w-full bg-white/90 p-5">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.3em] text-slate-500">
-                      {stat.label}
-                    </p>
-                    <p className="mt-2 text-4xl font-semibold text-slate-900">
-                      {stat.value}
-                    </p>
-                    <p className="text-sm text-slate-500">{stat.sub}</p>
-                  </div>
-                  <div className="rounded-2xl bg-white/80 p-3 backdrop-blur-xl">
-                    <stat.icon className="h-6 w-6 text-slate-900" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </section>
         {errorMessage && (
           <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700">
             {errorMessage}
           </div>
         )}
 
-        <section className="mt-10 space-y-6">
-          <div className="space-y-6">
-            <div className="grid gap-6 xl:grid-cols-2">
+        <section className="mt-8 space-y-5">
+          <div className="space-y-4">
+            <div
+              className={clsx(
+                'grid gap-4',
+                groupedEvents.length > 2
+                  ? 'lg:grid-cols-2 2xl:grid-cols-3'
+                  : groupedEvents.length === 2
+                    ? 'lg:grid-cols-2'
+                    : 'grid-cols-1',
+              )}
+            >
               {isLoading ? (
                 <div className="glass-panel flex flex-col items-center gap-2 px-6 py-12 text-center text-slate-500">
                   <Sparkles className="h-10 w-10 text-slate-300 animate-pulse" />
@@ -482,11 +466,16 @@ function App() {
                     >
                       {group.label}
                     </div>
-                    <div className="grid grid-cols-[1fr,1.5fr,0.8fr,110px] border-b border-slate-100 px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                    <div className={clsx(
+                      'grid border-b border-slate-100 px-6 py-3 text-xs font-semibold uppercase tracking-[0.3em] text-slate-400',
+                      isAuthenticated
+                        ? 'grid-cols-[1fr,1.5fr,0.8fr,110px]'
+                        : 'grid-cols-[1fr,1.5fr,0.8fr]',
+                    )}>
                       <span>Mesin</span>
                       <span>Detail Pekerjaan</span>
                       <span className="text-center">Criticality</span>
-                      <span className="text-center">Aksi</span>
+                      {isAuthenticated && <span className="text-center">Aksi</span>}
                     </div>
                     <div className="divide-y divide-slate-100">
                       <AnimatePresence initial={false}>
@@ -500,12 +489,17 @@ function App() {
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               exit={{ opacity: 0, y: -10 }}
-                              className="grid grid-cols-[1fr,1.5fr,0.8fr,110px] items-center gap-4 rounded-2xl border border-slate-100 bg-white/80 px-6 py-5 text-left shadow-sm transition hover:-translate-y-1 hover:bg-white hover:shadow-lg"
-                            >
-                              <div>
-                                <p className="text-base font-semibold text-slate-900">
-                                  {event.system}
-                                </p>
+                            className={clsx(
+                              'grid items-center gap-4 rounded-2xl border border-slate-100 bg-white/80 px-6 py-4 text-left shadow-sm transition hover:-translate-y-1 hover:bg-white hover:shadow-lg',
+                              isAuthenticated
+                                ? 'grid-cols-[1fr,1.5fr,0.8fr,110px]'
+                                : 'grid-cols-[1fr,1.5fr,0.8fr]',
+                            )}
+                          >
+                            <div>
+                              <p className="text-base font-semibold text-slate-900">
+                                {event.system}
+                              </p>
                               </div>
                               <div>
                                 <p className="text-base font-semibold text-slate-900">
@@ -520,44 +514,34 @@ function App() {
                               >
                               {event.impact}
                             </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  if (!isAuthenticated) {
-                                    window.alert('Silakan login terlebih dahulu.')
-                                    return
-                                  }
-                                  openEditModal(event)
-                                }}
-                                disabled={!isAuthenticated || isSyncing}
-                                className={clsx(
-                                  'rounded-full p-2 transition',
-                                  isAuthenticated && !isSyncing
-                                    ? 'bg-slate-900/10 hover:bg-slate-900/20'
-                                    : 'cursor-not-allowed bg-slate-200 text-slate-400',
-                                )}
-                              >
-                                <PencilLine className="h-4 w-4 text-slate-900" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (!isAuthenticated) {
-                                    window.alert('Silakan login terlebih dahulu.')
-                                    return
-                                  }
-                                  handleDelete(event.id)
-                                }}
-                                disabled={!isAuthenticated || isSyncing}
-                                className={clsx(
-                                  'rounded-full p-2 transition',
-                                  isAuthenticated && !isSyncing
-                                    ? 'bg-rose-100 text-rose-600 hover:bg-rose-200'
-                                    : 'cursor-not-allowed bg-rose-50 text-rose-300',
-                                )}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
+                            {isAuthenticated && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => openEditModal(event)}
+                                  disabled={isSyncing}
+                                  className={clsx(
+                                    'rounded-full p-2 transition',
+                                    !isSyncing
+                                      ? 'bg-slate-900/10 hover:bg-slate-900/20'
+                                      : 'cursor-not-allowed bg-slate-200 text-slate-400',
+                                  )}
+                                >
+                                  <PencilLine className="h-4 w-4 text-slate-900" />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(event.id)}
+                                  disabled={isSyncing}
+                                  className={clsx(
+                                    'rounded-full p-2 transition',
+                                    !isSyncing
+                                      ? 'bg-rose-100 text-rose-600 hover:bg-rose-200'
+                                      : 'cursor-not-allowed bg-rose-50 text-rose-300',
+                                  )}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            )}
                           </motion.div>
                           )
                         })}
