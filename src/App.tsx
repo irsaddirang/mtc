@@ -111,6 +111,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [showLoginModal, setShowLoginModal] = useState(false)
+  const [loginInput, setLoginInput] = useState('')
+  const [loginError, setLoginError] = useState('')
 
   const normaliseEvent = (row: Record<string, any>): MaintenanceEvent => ({
     id: row.id ?? row.uuid ?? '',
@@ -330,13 +333,17 @@ function App() {
   }
 
   const handleLogin = () => {
-    if (typeof window === 'undefined') return
-    const input = window.prompt('Masukkan password akses jadwal maintenance')
-    if (input === PASSCODE) {
+    setLoginInput('')
+    setLoginError('')
+    setShowLoginModal(true)
+  }
+
+  const confirmLogin = () => {
+    if (loginInput === PASSCODE) {
       setIsAuthenticated(true)
-      window.alert('Login berhasil. Anda dapat membuka Jadwalkan Maint.')
+      setShowLoginModal(false)
     } else {
-      window.alert('Password salah.')
+      setLoginError('Password salah, coba lagi.')
     }
   }
 
@@ -706,6 +713,63 @@ function App() {
             }}
             onSubmit={handleSubmit}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showLoginModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-panel w-full max-w-sm p-6 focus:outline-none"
+            >
+              <h2 className="text-lg font-semibold text-slate-900">Login Akses</h2>
+              <p className="text-sm text-slate-500">
+                Masukkan password untuk mengakses tombol aksi maintenance.
+              </p>
+              <input
+                type="password"
+                value={loginInput}
+                onChange={(e) => {
+                  setLoginInput(e.target.value)
+                  setLoginError('')
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') confirmLogin()
+                  if (e.key === 'Escape') setShowLoginModal(false)
+                }}
+                className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-aurora-blue focus:outline-none"
+                placeholder="Masukkan password"
+                autoFocus
+              />
+              {loginError && (
+                <p className="mt-2 text-sm text-rose-600">{loginError}</p>
+              )}
+              <div className="mt-5 flex justify-end gap-3 text-sm font-semibold">
+                <button
+                  onClick={() => setShowLoginModal(false)}
+                  className="rounded-full border border-slate-200 px-4 py-2 text-slate-500 transition hover:bg-white/70"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={confirmLogin}
+                  className="rounded-full bg-slate-900 px-4 py-2 text-white transition hover:bg-slate-800"
+                >
+                  Masuk
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 
