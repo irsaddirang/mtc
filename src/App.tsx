@@ -5,6 +5,7 @@ import {
   Activity,
   CalendarClock,
   CalendarPlus,
+  CheckCircle2,
   PencilLine,
   Sparkles,
   Trash2,
@@ -190,7 +191,9 @@ function App() {
       string,
       { key: string; label: string; items: MaintenanceEvent[] }
     >()
-    filteredEvents.forEach((event) => {
+    filteredEvents
+      .filter((event) => event.status !== 'Completed')
+      .forEach((event) => {
       const key = getDateKey(event.startDate)
       if (!map.has(key)) {
         map.set(key, { key, label: formatDate(event.startDate), items: [] })
@@ -199,6 +202,11 @@ function App() {
     })
     return Array.from(map.values())
   }, [filteredEvents])
+
+  const completedEvents = useMemo(
+    () => events.filter((event) => event.status === 'Completed'),
+    [events],
+  )
 
   const handleSubmit = async (payload: MaintenanceDraft) => {
     try {
@@ -267,6 +275,28 @@ function App() {
     } catch (error) {
       console.error(error)
       window.alert('Gagal menghapus jadwal.')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  const handleToggleComplete = async (event: MaintenanceEvent) => {
+    if (isSyncing) return
+    try {
+      setIsSyncing(true)
+      const nextStatus = event.status === 'Completed' ? 'Scheduled' : 'Completed'
+      const { error } = await supabase
+        .from('maintenance_events')
+        .update({
+          status: nextStatus,
+          end_date: nextStatus === 'Completed' ? new Date().toISOString() : event.endDate,
+        })
+        .eq('id', event.id)
+      if (error) throw error
+      await fetchEvents()
+    } catch (error) {
+      console.error(error)
+      window.alert('Gagal memperbarui status.')
     } finally {
       setIsSyncing(false)
     }
@@ -374,7 +404,7 @@ function App() {
           transition={{ delay: 0.05 }}
           className="glass-panel animated-header relative overflow-hidden p-8"
         >
-          <div className="relative grid gap-6 lg:grid-cols-[1.2fr,1fr] 2xl:grid-cols-[1.1fr,1.3fr]">
+          <div className="relative grid gap-6 lg:grid-cols-[1.5fr,1fr] 2xl:grid-cols-[1.3fr,1fr]">
             <div>
               <h1 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 md:text-4xl">
                 Jadwal Pekerjaan Maintenance
@@ -382,6 +412,47 @@ function App() {
               <p className="mt-2 text-sm text-slate-600">
                 Pantau jadwal maintenance lintas sistem dalam satu view responsif.
               </p>
+
+              {completedEvents.length > 0 && (
+                <div className="mt-6 space-y-3 rounded-2xl border border-white/30 bg-white/30 p-4 shadow-inner">
+                  <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.3em] text-slate-600">
+                    <span>Done</span>
+                    <span>{completedEvents.length}</span>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {completedEvents.slice(0, 6).map((event) => (
+                      <div
+                        key={event.id}
+                        className="flex items-center justify-between rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-[11px] text-emerald-800 shadow-sm"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] text-white">
+                            ✓
+                          </span>
+                          <div>
+                            <p className="font-semibold leading-tight">{event.system}</p>
+                            <p className="text-[10px] text-emerald-700">
+                              {formatDate(event.endDate, 'd MMM · HH:mm')}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleToggleComplete(event)}
+                          disabled={isSyncing}
+                          className="rounded-full border border-emerald-500 bg-white/80 p-1 text-emerald-600 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {completedEvents.length > 6 && (
+                      <div className="rounded-2xl border border-emerald-200/70 bg-white/70 px-3 py-2 text-center text-[11px] text-emerald-700">
+                        +{completedEvents.length - 6} lainnya
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3">
               {[
@@ -496,11 +567,25 @@ function App() {
                                 : 'grid-cols-[1fr,1.5fr,0.8fr]',
                             )}
                           >
-                            <div>
-                              <p className="text-base font-semibold text-slate-900">
-                                {event.system}
-                              </p>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => handleToggleComplete(event)}
+                                disabled={isSyncing}
+                                className={clsx(
+                                  'rounded-full border p-1 transition',
+                                  event.status === 'Completed'
+                                    ? 'border-emerald-500 bg-emerald-500 text-white'
+                                    : 'border-slate-200 bg-white text-slate-400 hover:border-emerald-300 hover:text-emerald-500',
+                                )}
+                              >
+                                <CheckCircle2 className="h-4 w-4" />
+                              </button>
+                              <div>
+                                <p className="text-base font-semibold text-slate-900">
+                                  {event.system}
+                                </p>
                               </div>
+                            </div>
                               <div>
                                 <p className="text-base font-semibold text-slate-900">
                                   {jobDetail}
@@ -558,6 +643,49 @@ function App() {
             </div>
           </div>
 
+          {completedEvents.length > 0 && (
+            <div className="glass-panel space-y-3 p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Pekerjaan selesai
+                </h2>
+                <span className="chip text-xs text-slate-600">
+                  {completedEvents.length} done
+                </span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {completedEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="flex flex-col rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-emerald-800 shadow-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-white">
+                        ✓
+                      </span>
+                      <p className="font-semibold">{event.system}</p>
+                    </div>
+                    <p className="mt-1 text-emerald-900">{event.title}</p>
+                    <p className="text-xs uppercase tracking-[0.2em] text-emerald-600">
+                      Done at {formatDate(event.endDate, "d MMM yyyy · HH:mm")}
+                    </p>
+                    <button
+                      onClick={() => handleToggleComplete(event)}
+                      disabled={isSyncing}
+                      className={clsx(
+                        'mt-2 inline-flex items-center justify-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-wide transition',
+                        !isSyncing
+                          ? 'border-emerald-600 text-emerald-600 hover:bg-emerald-100'
+                          : 'cursor-not-allowed border-slate-200 text-slate-400',
+                      )}
+                    >
+                      Kembalikan
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         <footer className="mt-16 flex flex-col items-center gap-3 text-center text-xs font-semibold text-slate-500">
