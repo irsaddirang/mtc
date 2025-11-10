@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Activity,
-  CalendarClock,
   CalendarPlus,
   CheckCircle2,
   PencilLine,
@@ -165,17 +163,6 @@ function App() {
     return () => window.clearInterval(interval)
   }, [fetchEvents])
 
-  const activeWindows = events.filter((event) => event.status !== 'Completed')
-  const totalMachines = new Set(
-    events
-      .map((event) => event.system.trim())
-      .filter((system) => system.length > 0),
-  ).size
-  const statCardGradients = [
-    'from-aurora-teal via-sky-300 to-aurora-blue',
-    'from-pink-400 via-red-400 to-amber-400',
-    'from-violet-400 via-fuchsia-400 to-amber-300',
-  ]
   const dayHeaderGradients = [
     'from-aurora-teal via-sky-300 to-aurora-blue',
     'from-pink-400 via-rose-300 to-orange-300',
@@ -353,6 +340,34 @@ function App() {
     setIsFormOpen(true)
   }
 
+  const handleClearCompleted = async () => {
+    if (!isAuthenticated) {
+      window.alert('Silakan login terlebih dahulu.')
+      return
+    }
+    if (completedEvents.length === 0) return
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm('Hapus semua pekerjaan selesai?')
+    ) {
+      return
+    }
+    try {
+      setIsSyncing(true)
+      const { error } = await supabase
+        .from('maintenance_events')
+        .delete()
+        .eq('status', 'Completed')
+      if (error) throw error
+      await fetchEvents()
+    } catch (error) {
+      console.error(error)
+      window.alert('Gagal membersihkan pekerjaan selesai.')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900">
       <div className="mx-auto w-full max-w-[2000px] px-4 pb-20 pt-10 md:px-10">
@@ -411,103 +426,13 @@ function App() {
           transition={{ delay: 0.05 }}
           className="glass-panel animated-header relative overflow-hidden p-8"
         >
-          <div className="relative grid gap-6 lg:grid-cols-[1.5fr,1fr] 2xl:grid-cols-[1.3fr,1fr]">
-            <div>
-              <h1 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 md:text-4xl">
-                Jadwal Pekerjaan Maintenance
-              </h1>
-              <p className="mt-2 text-sm text-slate-600">
-                Pantau jadwal maintenance lintas sistem dalam satu view responsif.
-              </p>
-
-              {completedEvents.length > 0 && (
-                <div className="mt-6 space-y-3 rounded-2xl border border-white/30 bg-white/30 p-4 shadow-inner">
-                  <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.3em] text-slate-600">
-                    <span>Done</span>
-                    <span>{completedEvents.length}</span>
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {completedEvents.slice(0, 6).map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex items-center justify-between rounded-2xl border border-emerald-200/70 bg-emerald-50/80 px-3 py-2 text-[11px] text-emerald-800 shadow-sm"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] text-white">
-                            ✓
-                          </span>
-                          <div>
-                            <p className="font-semibold leading-tight">{event.system}</p>
-                            <p className="text-[10px] text-emerald-700">
-                              {formatDate(event.endDate, 'd MMM · HH:mm')}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleToggleComplete(event)}
-                          disabled={isSyncing}
-                          className="rounded-full border border-emerald-500 bg-white/80 p-1 text-emerald-600 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                    {completedEvents.length > 6 && (
-                      <div className="rounded-2xl border border-emerald-200/70 bg-white/70 px-3 py-2 text-center text-[11px] text-emerald-700">
-                        +{completedEvents.length - 6} lainnya
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-2 2xl:grid-cols-3">
-              {[
-                {
-                  label: 'Active windows',
-                  value: activeWindows.length,
-                  sub: `${events.length} jadwal keseluruhan`,
-                  icon: CalendarClock,
-                },
-                {
-                  label: 'High impact',
-                  value: events.filter((event) => event.impact === 'High').length,
-                  sub: 'latensi diawasi langsung',
-                  icon: Activity,
-                },
-                {
-                  label: 'Total machine',
-                  value: totalMachines,
-                  sub: 'mesin terjadwal',
-                  icon: Sparkles,
-                },
-              ].map((stat, index) => (
-                <div
-                  key={stat.label}
-                  className={clsx(
-                    'relative overflow-hidden rounded-3xl p-[1px] shadow-xl bg-gradient-to-br',
-                    statCardGradients[(index + 1) % statCardGradients.length],
-                  )}
-                >
-                  <div className="glass-panel relative h-full w-full bg-white/90 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
-                          {stat.label}
-                        </p>
-                        <p className="mt-1 text-3xl font-semibold text-slate-900">
-                          {stat.value}
-                        </p>
-                        <p className="text-xs text-slate-500">{stat.sub}</p>
-                      </div>
-                      <div className="rounded-2xl bg-white/80 p-3 backdrop-blur-xl">
-                        <stat.icon className="h-5 w-5 text-slate-900" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div>
+            <h1 className="text-3xl font-semibold leading-tight tracking-tight text-slate-900 md:text-4xl">
+              Jadwal Pekerjaan Maintenance
+            </h1>
+            <p className="mt-2 text-sm text-slate-600">
+              Pantau jadwal maintenance lintas sistem dalam satu view responsif.
+            </p>
           </div>
         </motion.section>
         {errorMessage && (
@@ -656,9 +581,24 @@ function App() {
                 <h2 className="text-lg font-semibold text-slate-900">
                   Pekerjaan selesai
                 </h2>
-                <span className="chip text-xs text-slate-600">
-                  {completedEvents.length} done
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
+                    {completedEvents.length} selesai
+                  </span>
+                  <button
+                    onClick={handleClearCompleted}
+                    disabled={!isAuthenticated || isSyncing}
+                    className={clsx(
+                      'inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wide transition',
+                      isAuthenticated && !isSyncing
+                        ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
+                        : 'cursor-not-allowed bg-slate-100 text-slate-400',
+                    )}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Clear selesai
+                  </button>
+                </div>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {completedEvents.map((event) => (
